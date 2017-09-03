@@ -32,9 +32,12 @@ def svm_loss_naive(W, X, y, reg):
     for j in xrange(num_classes):
       if j == y[i]:
         continue
-      margin = scores[j] - correct_class_score + 1 # note delta = 1
+      margin = scores[j] - correct_class_score + 1 # note delta = 1    
       if margin > 0:
         loss += margin
+        #pass      
+        dW[:,j] += X[i].T
+        dW[:,y[i]] += -X[i].T
 
   # Right now the loss is a sum over all training examples, but we want it
   # to be an average instead so we divide by num_train.
@@ -42,6 +45,8 @@ def svm_loss_naive(W, X, y, reg):
 
   # Add regularization to the loss.
   loss += reg * np.sum(W * W)
+  
+  dW = dW/num_train + 2*reg*W 
 
   #############################################################################
   # TODO:                                                                     #
@@ -62,6 +67,7 @@ def svm_loss_vectorized(W, X, y, reg):
 
   Inputs and outputs are the same as svm_loss_naive.
   """
+
   loss = 0.0
   dW = np.zeros(W.shape) # initialize the gradient as zero
 
@@ -70,7 +76,21 @@ def svm_loss_vectorized(W, X, y, reg):
   # Implement a vectorized version of the structured SVM loss, storing the    #
   # result in loss.                                                           #
   #############################################################################
-  pass
+  #pass
+  #margin = scores - correct_class_score + 1 
+  num_classes = W.shape[1]
+  num_train = X.shape[0]
+    
+  all_scores = X.dot(W)
+  correct_class_score = all_scores[range(num_train),y].reshape(-1,1)
+  
+  margins = np.maximum(0, all_scores - correct_class_score + 1)
+  margins[range(num_train),y] = 0
+     
+  loss = np.sum(margins)
+  loss /= num_train
+    
+  loss += reg * np.sum(W * W)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -85,7 +105,15 @@ def svm_loss_vectorized(W, X, y, reg):
   # to reuse some of the intermediate values that you used to compute the     #
   # loss.                                                                     #
   #############################################################################
-  pass
+  #pass
+  coeff_mat = np.zeros((num_train, num_classes))
+  coeff_mat[margins > 0] = 1
+  coeff_mat[range(num_train), list(y)] = 0
+  coeff_mat[range(num_train), list(y)] = -np.sum(coeff_mat, axis=1)
+
+  dW = (X.T).dot(coeff_mat)
+  dW = dW/num_train + 2*reg*W     
+    
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
