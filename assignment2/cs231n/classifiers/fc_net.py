@@ -5,7 +5,6 @@ import numpy as np
 from cs231n.layers import *
 from cs231n.layer_utils import *
 
-
 class TwoLayerNet(object):
     """
     A two-layer fully-connected neural network with ReLU nonlinearity and
@@ -268,8 +267,7 @@ class FullyConnectedNet(object):
             else:  
                 key_gamma = 'gamma'+str(i)
                 key_beta = 'beta'+str(i)
-                current_input, affine_bn_relu_cache[i] = affine_bn_relu_forward(current_input, self.params[keyW], self.params[keyb],
-                                                                                        self.params[key_gamma], self.params[key_beta], self.bn_params[i-1] )
+                current_input, affine_bn_relu_cache[i] = affine_bn_relu_forward(current_input, self.params[keyW], self.params[keyb],self.params[key_gamma], self.params[key_beta], self.bn_params[i-1] )
 
             if self.use_dropout:
                 current_input, dropout_cache[i] = dropout_forward(current_input,self.dropout_param)  
@@ -335,3 +333,4 @@ class FullyConnectedNet(object):
         ############################################################################
 
         return loss, grads
+ 
