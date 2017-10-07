@@ -96,7 +96,10 @@ class CaptioningRNN(object):
         # by one relative to each other because the RNN should produce word (t+1)
         # after receiving word t. The first element of captions_in will be the START
         # token, and the first element of captions_out will be the first word.
+        
+        #captions_in has everything but the last word and will be input to the RNN
         captions_in = captions[:, :-1]
+        # captions_out has everything but the first word and this is what we will expect the RNN to generate
         captions_out = captions[:, 1:]
 
         # You'll need this
@@ -118,26 +121,66 @@ class CaptioningRNN(object):
         loss, grads = 0.0, {}
         ############################################################################
         # TODO: Implement the forward and backward passes for the CaptioningRNN.   #
-        # In the forward pass you will need to do the following:                   #
+        # In the forward pass you will need to do the following:             #
+        
         # (1) Use an affine transformation to compute the initial hidden state     #
         #     from the image features. This should produce an array of shape (N, H)#
+        
         # (2) Use a word embedding layer to transform the words in captions_in     #
         #     from indices to vectors, giving an array of shape (N, T, W).         #
+        
         # (3) Use either a vanilla RNN or LSTM (depending on self.cell_type) to    #
         #     process the sequence of input word vectors and produce hidden state  #
         #     vectors for all timesteps, producing an array of shape (N, T, H).    #
+        
         # (4) Use a (temporal) affine transformation to compute scores over the    #
         #     vocabulary at every timestep using the hidden states, giving an      #
         #     array of shape (N, T, V).                                            #
+        
         # (5) Use (temporal) softmax to compute loss using captions_out, ignoring  #
         #     the points where the output word is <NULL> using the mask above.     #
         #                                                                          #
+        
         # In the backward pass you will need to compute the gradient of the loss   #
         # with respect to all model parameters. Use the loss and grads variables   #
         # defined above to store loss and gradients; grads[k] should give the      #
-        # gradients for self.params[k].                                            #
+        # gradients for self.params[k].                               #
         ############################################################################
-        pass
+        
+        #pass
+        #(1) input: image features
+        #   output: initial h
+        initial_h = np.dot(features, W_proj) + b_proj
+        
+        #(2) input: words
+        #   output: word vectors
+        embed_word, embed_word_cache = word_embedding_forward(captions_in, W_embed)
+        
+        #(3) input: word vectors
+        #   output: h (hidden state)
+        if self.cell_type=='rnn':
+            h, h_cache = rnn_forward(embed_word, initial_h, Wx, Wh, b)
+        elif self.cell_type =='lstm':
+            h, h_cache = lstm_forward(embed_word, initial_h, Wx, Wh, b)
+            
+        #(4) affine transformation 
+        #    input: h
+        #    output: affine_forward_out 
+        affine_forward_out, affine_forward_cache = temporal_affine_forward(h, W_vocab, b_vocab)
+        
+        #(5) 
+        loss, dscore = temporal_softmax_loss(affine_forward_out, captions_out, mask, verbose=False)
+        
+        #backprop 
+        daffine_out, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dscore, affine_forward_cache)
+        if self.cell_type=='rnn':
+            dword_vector, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(daffine_out, h_cache)
+        elif self.cell_type=='lstm':
+            dword_vector, dh0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(daffine_out, h_cache)
+        grads['W_embed'] = word_embedding_backward(dword_vector, embed_word_cache)
+        grads['W_proj'] = features.T.dot(dh0) 
+        grads['b_proj'] = np.sum(dh0, axis=0)
+        
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -199,7 +242,56 @@ class CaptioningRNN(object):
         # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
         # a loop.                                                                 #
         ###########################################################################
-        pass
+        #pass
+        (N, D) = features.shape
+        prev_h = features.dot(W_proj) + b_proj
+        prev_c = np.zeros(prev_h.shape)
+        
+        
+        # self._start is the index of the word '<START>'
+        current_word_index = [self._start]*N
+        
+        for i in range(max_length):
+            
+            #(1)
+            x = W_embed[current_word_index]  # get word_vector from word_index
+            
+            #(2)
+            if self.cell_type=='rnn':
+                next_h, _ = rnn_step_forward(x, prev_h, Wx, Wh, b) #rnn_step_forward: prev_h.shape (N, H)
+            elif self.cell_type =='lstm':
+                next_h, next_c, _ = lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b)  
+                prev_c = next_c  
+            prev_h = next_h
+
+            #(3)
+            next_h = np.expand_dims(next_h, axis=1) 
+            score, _ = temporal_affine_forward(next_h, W_vocab, b_vocab) #temporal_affine_forward: x.shape(next_h here) (N, T, D)
+
+            #(4)
+            captions[:,i] = list(np.argmax(score, axis = 2)) 
+            current_word_index = captions[:,i]
+            
+            '''#(3)
+            # np.expand_dims from https://docs.scipy.org/doc/numpy/reference/generated/numpy.expand_dims.html
+            
+            >>> x = np.array([1,2])
+            >>> x.shape
+            (2,)
+            The following is equivalent to x[np.newaxis,:] or x[np.newaxis]:
+
+            >>> y = np.expand_dims(x, axis=0)
+            >>> y
+            array([[1, 2]])
+            >>> y.shape
+            (1, 2)
+            >>> y = np.expand_dims(x, axis=1)  # Equivalent to x[:,newaxis]
+            >>> y
+            array([[1],
+                [2]])
+            >>> y.shape
+            (2, 1)
+            '''
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
