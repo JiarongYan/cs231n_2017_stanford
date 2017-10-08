@@ -272,7 +272,9 @@ class CaptioningRNN(object):
             captions[:,i] = list(np.argmax(score, axis = 2)) 
             current_word_index = captions[:,i]
             
-            '''#(3)
+            '''
+            Added by Jiarong
+            #(3) explain np.expand_dims:
             # np.expand_dims from https://docs.scipy.org/doc/numpy/reference/generated/numpy.expand_dims.html
             
             >>> x = np.array([1,2])
